@@ -1,0 +1,12 @@
+node_modules/
+dist/
+out/
+coverage/
+.vscode-test/
+.superpowers/
+docs/superpowers/
+*.vsix
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db

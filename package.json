@@ -1,0 +1,87 @@
+{
+  "name": "first-read",
+  "displayName": "First Read",
+  "description": "Highlight essential Python and C++ code and explain hovered statements with an OpenAI-compatible endpoint.",
+  "version": "0.1.0",
+  "publisher": "first-read-local",
+  "private": true,
+  "type": "commonjs",
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onLanguage:python",
+    "onLanguage:cpp"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "First Read sends source code to a configured model service and is disabled until the workspace is trusted."
+    },
+    "virtualWorkspaces": false
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "firstRead.toggleFocus",
+        "title": "Toggle Focus Mode",
+        "category": "First Read"
+      },
+      {
+        "command": "firstRead.toggleHover",
+        "title": "Toggle Hover Explanations",
+        "category": "First Read"
+      },
+      {
+        "command": "firstRead.setApiKey",
+        "title": "Set API Key",
+        "category": "First Read"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "firstRead.toggleFocus",
+        "key": "ctrl+alt+f",
+        "mac": "cmd+alt+f",
+        "when": "editorTextFocus && (editorLangId == python || editorLangId == cpp)"
+      }
+    ],
+    "configuration": {
+      "title": "First Read",
+      "properties": {
+        "firstRead.endpoint": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "markdownDescription": "Base URL of the OpenAI-compatible service, for example `https://api.example.com/v1` or a loopback server such as `http://127.0.0.1:11434/v1`. HTTPS or loopback HTTP only. Source code is sent here after explicit consent, and the extension never retries or follows redirects."
+        },
+        "firstRead.model": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "markdownDescription": "Model name sent to the configured Chat Completions endpoint, for example `gpt-4o-mini` or a local model identifier."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "esbuild src/extension.ts --bundle --platform=node --format=cjs --target=node20 --external:vscode --outfile=dist/extension.js --sourcemap",
+    "watch": "npm run build -- --watch",
+    "check": "tsc --noEmit",
+    "test": "node --import tsx --test \"test/**/*.test.ts\"",
+    "vscode:prepublish": "npm run build -- --minify",
+    "package": "vsce package --no-dependencies --allow-missing-repository --skip-license"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/vscode": "^1.95.0",
+    "@vscode/vsce": "^3.2.0",
+    "esbuild": "^0.25.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0"
+  }
+}

@@ -1,0 +1,16 @@
+.vscode/**
+.vscode-test/**
+.superpowers/**
+docs/**
+samples/**
+src/**
+test/**
+node_modules/**
+**/*.ts
+**/*.map
+tsconfig.json
+package-lock.json
+.gitignore
+.vscodeignore
+.eslintrc*
+*.vsix
