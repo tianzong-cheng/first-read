@@ -1055,11 +1055,12 @@ export class FocusController<E extends FocusEditor = FocusEditor> {
     try {
       core = validateCore(raw, plan.coverage);
     } catch (error) {
+      const code = error instanceof FocusRangeError ? error.code : 'unknown';
+      this.diagnose(`failure:validation:${code}; response=${JSON.stringify(raw)}`);
       if (!canSend()) {
         this.diagnose('stale');
         return undefined;
       }
-      this.diagnose(`failure:validation:${error instanceof FocusRangeError ? error.code : 'unknown'}`);
       this.notifyForSnapshot(
         state,
         snapshot,
