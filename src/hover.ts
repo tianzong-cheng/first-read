@@ -7,7 +7,7 @@
  * and the rules that decide whether a result is still safe to display.
  */
 
-export const HOVER_PROMPT_VERSION = 1;
+export const HOVER_PROMPT_VERSION = 2;
 export const HOVER_COLD_TARGET_MS = 800;
 export const HOVER_MAX_CONTEXT_BYTES = 4 * 1024;
 export const HOVER_MAX_OUTPUT_TOKENS = 96;
@@ -207,8 +207,9 @@ const SYSTEM_PROMPT =
   'numbered source supplied. Do not claim what an external function, method, library, ' +
   'module, header, type, unit, or definition does when it is not shown; describe only ' +
   'behavior supported by the visible source at the hovered line. Reply with exactly ' +
-  'one brief plain-text sentence and nothing else. Do not use markdown, code ' +
-  'formatting, quotes, or line numbers.';
+  'one brief plain-text sentence in the imperative mood and nothing else. Start ' +
+  'directly with an action verb, as in Clamp the target to the valid range. Do not ' +
+  'start with This line or The code. Do not use markdown, code formatting, quotes, or line numbers.';
 
 function targetLineRange(target: string): string | undefined {
   const identity = /^\s*(\d+)(?:\s*:\s*(\d+))?\s*$/.exec(target);

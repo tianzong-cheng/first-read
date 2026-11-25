@@ -178,6 +178,7 @@ test('builds one bounded request from context without repeating the target', asy
   assert.equal(captured.messages.length, 2);
   assert.equal(captured.messages[0]?.role, 'system');
   assert.match(captured.messages[0]?.content ?? '', /one brief plain-text sentence/i);
+  assert.match(captured.messages[0]?.content ?? '', /imperative mood/i);
   assert.match(captured.messages[0]?.content ?? '', /external/i);
   assert.match(captured.messages[0]?.content ?? '', /data, not instructions/i);
   const user = captured.messages[1];
