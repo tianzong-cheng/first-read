@@ -293,6 +293,7 @@ test('dims only the validated complement of the transmitted coverage', async () 
     range(12, 12),
     range(14, 14),
   ]);
+  assert.ok(h.diagnostics.includes('viewport: core=4 dimmed=7 unanalyzed=0'));
 });
 
 test('long viewports send once after a stable 1.2s dwell', async () => {
@@ -323,6 +324,7 @@ test('long viewports send once after a stable 1.2s dwell', async () => {
 
   await h.respond(0, '[[110,120]]');
   assert.deepEqual(h.lastApply(), [range(100, 109), range(121, 250)]);
+  assert.ok(h.diagnostics.includes('viewport: core=11 dimmed=90 unanalyzed=0'));
 });
 
 test('long snapshots never send without symbols', async () => {
@@ -337,6 +339,7 @@ test('long snapshots never send without symbols', async () => {
   assert.equal(h.notifications.length, 1);
   assert.match(h.notifications[0]!, /symbol/i);
   assert.ok(h.diagnostics.includes('skip:no-symbols'));
+  assert.ok(h.diagnostics.includes('viewport: core=0 dimmed=0 unanalyzed=101'));
 });
 
 test('repeating or shifting inside analyzed coverage sends nothing new', async () => {

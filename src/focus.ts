@@ -622,6 +622,7 @@ export class FocusController<E extends FocusEditor = FocusEditor> {
     this.diagnose('reuse');
     if (this.canRun(state, snapshot, state.revision)) {
       this.applyDim(state, subtractRanges(state.coverage, state.core));
+      this.reportViewport(state);
     }
     return uncovered.length === 0;
   }
@@ -741,6 +742,7 @@ export class FocusController<E extends FocusEditor = FocusEditor> {
     if (this.visibleIsCovered(state, snapshot)) {
       state.edited = false;
       this.diagnose('skip:already-covered');
+      this.reportViewport(state);
       this.setStable(state, snapshot);
       return;
     }
@@ -771,6 +773,7 @@ export class FocusController<E extends FocusEditor = FocusEditor> {
         if (symbols.length === 0) {
           this.clearStable(state, snapshot);
           this.diagnose('skip:no-symbols');
+          this.reportViewport(state);
           this.notifyForSnapshot(
             state,
             snapshot,
@@ -801,6 +804,7 @@ export class FocusController<E extends FocusEditor = FocusEditor> {
       }
       if (plan.kind === 'none') {
         this.diagnose(`skip:${plan.reason}`);
+        this.reportViewport(state);
         if (plan.reason === 'already-covered') {
           state.edited = false;
           this.setStable(state, snapshot);
@@ -824,6 +828,7 @@ export class FocusController<E extends FocusEditor = FocusEditor> {
       if (!small && plan.target === 'whole') {
         this.clearStable(state, snapshot);
         this.diagnose('skip:no-symbols');
+        this.reportViewport(state);
         this.notifyForSnapshot(
           state,
           snapshot,
@@ -1106,6 +1111,18 @@ export class FocusController<E extends FocusEditor = FocusEditor> {
     state.edited = false;
     this.rememberSnapshot(snapshot, state.coverage, state.core);
     this.applyDim(state, subtractRanges(state.coverage, state.core));
+    this.reportViewport(state);
+  }
+
+  private reportViewport(state: FocusState<E>): void {
+    if (!this.diagnosticFn) return;
+    const visible = readVisible(state.editor).visibleRanges;
+    const count = (ranges: readonly LineRange[]) =>
+      ranges.reduce((total, { start, end }) => total + end - start + 1, 0);
+    const total = count(visible);
+    const unanalyzed = count(subtractRanges(visible, state.coverage));
+    const core = total - count(subtractRanges(visible, state.core));
+    this.diagnose(`viewport: core=${core} dimmed=${total - unanalyzed - core} unanalyzed=${unanalyzed}`);
   }
 
   private restoreDecorations(state: FocusState<E>, snapshot: FocusSnapshot): void {
