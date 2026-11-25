@@ -103,6 +103,14 @@
           "default": "",
           "scope": "machine",
           "markdownDescription": "Model name sent to the configured Chat Completions endpoint, for example `gpt-4o-mini` or a local model identifier."
+        },
+        "firstRead.explanationLanguage": {
+          "type": "string",
+          "enum": ["en", "zh-CN"],
+          "enumItemLabels": ["English", "简体中文"],
+          "default": "en",
+          "scope": "application",
+          "description": "Language for First Read hover explanations."
         }
       }
     }

@@ -67,8 +67,11 @@ export interface HoverConfigIdentity {
   readonly generation: number;
 }
 
+export type ExplanationLanguage = 'en' | 'zh-CN';
+
 export interface HoverExplanationRequest {
   readonly language: string;
+  readonly explanationLanguage: ExplanationLanguage;
   /** One-based line where the hover is anchored. */
   readonly line: number;
   /** Document version captured when the hover began. */
@@ -208,8 +211,8 @@ const SYSTEM_PROMPT =
   'module, header, type, unit, or definition does when it is not shown; describe only ' +
   'behavior supported by the visible source at the hovered line. Reply with exactly ' +
   'one brief plain-text sentence in the imperative mood and nothing else. Start ' +
-  'directly with an action verb, as in Clamp the target to the valid range. Do not ' +
-  'start with This line or The code. Do not use markdown, code formatting, quotes, or line numbers.';
+  'directly with an action verb or imperative construction. Do not introduce the answer with This line or The code. ' +
+  'Do not use markdown, code formatting, quotes, or line numbers.';
 
 function targetLineRange(target: string): string | undefined {
   const identity = /^\s*(\d+)(?:\s*:\s*(\d+))?\s*$/.exec(target);
@@ -258,9 +261,12 @@ export function buildHoverModelCall(
     `Hovered line: ${request.line}\n` +
     (targetRange === undefined ? '' : `Target lines: ${targetRange}\n`) +
     `\nNumbered context:\n${request.context}`;
+  const wording = request.explanationLanguage === 'zh-CN'
+    ? 'Reply in Simplified Chinese. Example style: 将目标值限制在有效范围内。'
+    : 'Reply in English. Example style: Clamp the target to the valid range.';
   return {
     messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'system', content: `${SYSTEM_PROMPT} ${wording}` },
       { role: 'user', content: user },
     ],
     maxTokens: HOVER_MAX_OUTPUT_TOKENS,
@@ -613,6 +619,7 @@ export class HoverEngine {
     return JSON.stringify([
       HOVER_PROMPT_VERSION,
       request.language,
+      request.explanationLanguage,
       request.line,
       request.context,
       request.target,

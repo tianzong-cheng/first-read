@@ -203,7 +203,10 @@ export class SettingsService implements vscode.Disposable {
 
     this.disposables.push(
       host.onDidChangeConfiguration((event) => {
-        if (event.affectsConfiguration(CONFIG_SECTION)) {
+        if (
+          event.affectsConfiguration(`${CONFIG_SECTION}.${ENDPOINT_CONFIG_KEY}`) ||
+          event.affectsConfiguration(`${CONFIG_SECTION}.${MODEL_CONFIG_KEY}`)
+        ) {
           // Record the transition before any async work. A rapid A -> B -> A
           // sequence must still revoke the old A approval.
           this.observeEndpointTransition();

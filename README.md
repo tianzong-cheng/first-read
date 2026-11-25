@@ -7,6 +7,7 @@ Read unfamiliar Python and C++ in desktop VS Code. Focus mode leaves important c
 1. In **User Settings**, set `firstRead.endpoint` to the base URL of an OpenAI-compatible API (for example `https://api.openai.com/v1` or `http://127.0.0.1:11434/v1`) and set `firstRead.model` to an available chat model.
 2. If the endpoint requires credentials, run **First Read: Set API Key**. The key is stored in VS Code Secret Storage, not in settings.
 3. In a trusted workspace, open a Python or C++ file. Use the book icon in the editor title to turn both features on, or off if both are already enabled. Use the adjacent **First Read Options** arrow to change either feature independently. The extension asks for consent before first sending code to the configured endpoint.
+4. In **User Settings → First Read: Explanation Language**, choose **English** (default) or **简体中文**. Changing it clears the displayed hover explanations; the next hover uses the selected language without changing focus mode or API settings.
 
 First Read sends only source selected from the open editor buffer, **including unsaved changes**. Use a loopback endpoint if source must stay on the machine running the extension host. The extension does not persist its source or explanation caches. The selected model service may retain or bill requests according to its own policy.
 

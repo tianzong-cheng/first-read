@@ -139,7 +139,7 @@ interface Environment {
   readonly trustEmitter: FakeEmitter<void>;
   readonly createdEmitters: FakeEmitter<unknown>[];
   setEndpoint(endpoint: string): void;
-  fireConfig(): void;
+  fireConfig(changed?: string): void;
   onWarning(handler: () => Promise<string | undefined>): void;
 }
 
@@ -191,9 +191,10 @@ function createEnvironment(): Environment {
     setEndpoint(next) {
       endpoint = next;
     },
-    fireConfig() {
+    fireConfig(changed = CONFIG_SECTION) {
       configEmitter.fire({
-        affectsConfiguration: (section) => section === CONFIG_SECTION,
+        affectsConfiguration: (section: string) =>
+          section === changed || section.startsWith(`${changed}.`) || changed.startsWith(`${section}.`),
       } as vscode.ConfigurationChangeEvent);
     },
     onWarning(handler) {
@@ -209,6 +210,20 @@ function createHarness(): { environment: Environment; service: SettingsService }
     service: new SettingsService(environment.context, environment.host),
   };
 }
+
+test('changing the explanation language preserves model generation and consent', async () => {
+  const { service, environment } = createHarness();
+  try {
+    await service.initialize();
+    assert.equal(await service.ensureTransportConsent(), true);
+    const before = service.currentGeneration;
+    environment.fireConfig('firstRead.explanationLanguage');
+    assert.equal((await service.getModelRequestSettings(before)).generation, before);
+    assert.equal(service.hasTransportConsent(), true);
+  } finally {
+    service.dispose();
+  }
+});
 
 test('enabling with no endpoint reports setup without requesting consent', async () => {
   const { service, environment } = createHarness();

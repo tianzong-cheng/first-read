@@ -105,6 +105,7 @@ const validText = 'This line doubles the value and stores it in a local variable
 function request(overrides: Partial<HoverExplanationRequest> = {}): HoverExplanationRequest {
   return {
     language: 'python',
+    explanationLanguage: 'en',
     line: 12,
     documentVersion: 3,
     context: '11 | def scale(value):\n12 |     return value * 2',
@@ -118,6 +119,22 @@ function request(overrides: Partial<HoverExplanationRequest> = {}): HoverExplana
     ...overrides,
   };
 }
+
+test('English and Simplified Chinese hovers send distinct prompts and use separate cache entries', async () => {
+  const prompts: string[] = [];
+  const hover = engine(async (call) => {
+    const prompt = call.messages[0]!.content;
+    prompts.push(prompt);
+    return prompt.includes('Simplified Chinese') ? '将输入值加倍。' : 'Double the input value.';
+  });
+  assert.equal(await hover.explain(request(), new TestToken()), 'Double the input value.');
+  assert.equal(await hover.explain(request({ explanationLanguage: 'zh-CN' }), new TestToken()), '将输入值加倍。');
+  assert.equal(await hover.explain(request(), new TestToken()), 'Double the input value.');
+  assert.equal(prompts.length, 2);
+  assert.match(prompts[0]!, /in English/i);
+  assert.match(prompts[1]!, /in Simplified Chinese/i);
+  assert.ok(prompts.every((prompt) => /imperative mood/i.test(prompt)));
+});
 
 function engine(
   requestImpl: HoverRequester,
