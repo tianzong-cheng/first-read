@@ -250,6 +250,18 @@ function longDocument(): FakeDocument {
   return new FakeDocument('file:///long.py', longText());
 }
 
+test('reports the validation code without logging the model response', async () => {
+  const h = harness();
+  h.controller.toggle(new FakeEditor(smallDocument(), [[0, 19]]));
+  await flushMicrotasks();
+  await h.respond(0, '```json\n[[2,3]]\n```');
+
+  assert.deepEqual(h.diagnostics.filter((entry) => entry.startsWith('failure')), [
+    'failure:validation:malformed-json',
+  ]);
+  assert.equal(h.lastApply(), undefined);
+});
+
 test('dims only the validated complement of the transmitted coverage', async () => {
   const h = harness();
   const document = new FakeDocument(

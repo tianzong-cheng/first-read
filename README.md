@@ -18,6 +18,8 @@ For `api.deepseek.com`, First Read disables DeepSeek thinking mode so the output
 - **Hover:** Off by default. A cold pointer hover targets approximately 800 ms before sending, with VS Code's provider delay included. First Read uses a multi-line statement when the language provider supplies a useful range; otherwise it uses limited line context. Moving away before dispatch prevents the request. After dispatch, the request completes and later hovers can reuse its result. VS Code also invokes the same native provider for keyboard and programmatic hover requests; it does not tell the extension which trigger was used.
 - **Troubleshooting:** Install or enable a Python/C++ language extension with document symbols if a long file cannot be analyzed. Invalid responses leave code unchanged. The **First Read** output channel reports requests, timing and cache activity, not source or model responses. Token usage is shown only if provided by the service.
 
+  For invalid focus responses, look for `focus failure:validation:<code>`, such as `malformed-json` or `crosses-gap`. The log contains only the error code, not the response.
+
 ## Development
 
 ```sh

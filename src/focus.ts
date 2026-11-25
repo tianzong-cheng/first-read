@@ -11,6 +11,7 @@
 import { createHash } from 'node:crypto';
 
 import {
+  FocusRangeError,
   FOCUS_SOURCE_BUDGET_BYTES,
   isSmallFocusSnapshot,
   mergeRanges,
@@ -1053,12 +1054,12 @@ export class FocusController<E extends FocusEditor = FocusEditor> {
     let core: LineRange[];
     try {
       core = validateCore(raw, plan.coverage);
-    } catch {
+    } catch (error) {
       if (!canSend()) {
         this.diagnose('stale');
         return undefined;
       }
-      this.diagnose('failure');
+      this.diagnose(`failure:validation:${error instanceof FocusRangeError ? error.code : 'unknown'}`);
       this.notifyForSnapshot(
         state,
         snapshot,
