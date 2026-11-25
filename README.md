@@ -10,6 +10,8 @@ Read unfamiliar Python and C++ in desktop VS Code. Focus mode leaves important c
 
 First Read sends only source selected from the open editor buffer, **including unsaved changes**. Use a loopback endpoint if source must stay on the machine running the extension host. The extension does not persist its source or explanation caches. The selected model service may retain or bill requests according to its own policy.
 
+For `api.deepseek.com`, First Read disables DeepSeek thinking mode so the output budget is reserved for the answer.
+
 ## Reading behavior
 
 - **Focus:** Analyzed non-core code is rendered at 36% opacity. Small files are analyzed together. In long files, pause scrolling for 1.2 seconds; First Read analyzes code around the viewport using symbols from your Python or C++ language extension. Unanalyzed code stays at full brightness. Edits clear stale decorations; toggle focus off and on to rerun on a changed small file.

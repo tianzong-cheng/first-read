@@ -298,6 +298,20 @@ test('accepts HTTPS endpoints and posts to the completions path', async () => {
   assert.equal(calledUrl, 'https://api.example.test/v1/chat/completions');
 });
 
+test('disables DeepSeek thinking without changing other providers’ payloads', async () => {
+  for (const [endpoint, thinking] of [
+    ['https://api.deepseek.com/v1', { type: 'disabled' }],
+    ['https://api.example.test/v1', undefined],
+  ] as const) {
+    let body: Record<string, unknown> | undefined;
+    await complete({ endpoint, model: 'deepseek-flash' }, messages, 96, async (_url, init) => {
+      body = JSON.parse(String(init.body));
+      return Response.json({ choices: [{ message: { content: 'answer' } }] });
+    });
+    assert.deepEqual(body?.thinking, thinking, endpoint);
+  }
+});
+
 test('does not follow redirects', async () => {
   await withLoopbackServer(
     (_request, response) => {

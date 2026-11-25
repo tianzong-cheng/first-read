@@ -305,6 +305,7 @@ export async function complete(
     messages: bodyMessages,
     max_tokens: outputTokens,
     stream: false,
+    thinking: url.hostname === 'api.deepseek.com' ? { type: 'disabled' } : undefined,
   });
 
   const controller = new AbortController();
