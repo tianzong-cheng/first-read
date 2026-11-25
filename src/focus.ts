@@ -1061,7 +1061,7 @@ export class FocusController<E extends FocusEditor = FocusEditor> {
       core = validateCore(raw, plan.coverage);
     } catch (error) {
       const code = error instanceof FocusRangeError ? error.code : 'unknown';
-      this.diagnose(`failure:validation:${code}; response=${JSON.stringify(raw)}`);
+      this.diagnose(`validation.failed code=${code} response=${JSON.stringify(raw)}`);
       if (!canSend()) {
         this.diagnose('stale');
         return undefined;
@@ -1122,7 +1122,7 @@ export class FocusController<E extends FocusEditor = FocusEditor> {
     const total = count(visible);
     const unanalyzed = count(subtractRanges(visible, state.coverage));
     const core = total - count(subtractRanges(visible, state.core));
-    this.diagnose(`viewport: core=${core} dimmed=${total - unanalyzed - core} unanalyzed=${unanalyzed}`);
+    this.diagnose(`viewport core=${core} dimmed=${total - unanalyzed - core} unanalyzed=${unanalyzed}`);
   }
 
   private restoreDecorations(state: FocusState<E>, snapshot: FocusSnapshot): void {

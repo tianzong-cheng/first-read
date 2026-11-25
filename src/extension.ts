@@ -15,7 +15,7 @@ const languages = [{ language: 'python' }, { language: 'cpp' }];
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const settings = await createSettingsService(context);
-  const output = vscode.window.createOutputChannel('First Read');
+  const output = vscode.window.createOutputChannel('First Read', { log: true });
   const decoration = vscode.window.createTextEditorDecorationType({ opacity: '0.36' });
   const inlineHover = new InlineHover();
   let hoverEnabled = false;
@@ -31,19 +31,21 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     if (!settings.isGenerationCurrent(generation) || !canSend()) throw new vscode.CancellationError();
     const id = ++requests;
     const start = Date.now();
-    output.appendLine(`${feature} request #${id}`);
     try {
-      const result = await complete(config, messages, maxTokens, onSent && ((url, init) => {
+      const result = await complete(config, messages, maxTokens, (url, init) => {
         const response = fetch(url, init);
-        onSent();
+        output.info(`${feature}.request.sent request_id=${id}`);
+        onSent?.();
         return response;
-      }));
+      });
       const input = result.usage?.input;
       const outputTokens = result.usage?.output;
-      output.appendLine(`${feature} request #${id} completed in ${Date.now() - start} ms${input === undefined ? '' : `; input tokens: ${input}`}${outputTokens === undefined ? '' : `; output tokens: ${outputTokens}`}`);
+      output.info(`${feature}.request.completed request_id=${id} duration_ms=${Date.now() - start}${input === undefined ? '' : ` input_tokens=${input}`}${outputTokens === undefined ? '' : ` output_tokens=${outputTokens}`}`);
       return result.text;
     } catch (error) {
-      output.appendLine(`${feature} request #${id} failed in ${Date.now() - start} ms${error instanceof ModelError ? ` (${error.code})` : ''}`);
+      const code = error instanceof ModelError ? error.code : 'unknown';
+      const status = error instanceof ModelError ? error.status : undefined;
+      output.error(`${feature}.request.failed request_id=${id} duration_ms=${Date.now() - start} code=${code}${status === undefined ? '' : ` http_status=${status}`}`);
       throw error;
     }
   };
@@ -57,11 +59,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     apply: (editor, dim) => {
       editor.setDecorations(decoration, dim.map(({ start, end }) =>
         new vscode.Range(editor.document.lineAt(start - 1).range.start, editor.document.lineAt(end - 1).range.end)));
-      if (dim.length > 0) output.appendLine(`focus applied ${dim.length} decoration range(s)`);
     },
     notify: (message) => { void vscode.window.showWarningMessage(message); },
     isActive: (editor) => vscode.window.activeTextEditor === editor,
-    diagnostic: (kind) => output.appendLine(`focus ${kind}`),
+    diagnostic: (event) => {
+      if (event.startsWith('viewport ')) output.info(`focus.${event}`);
+      else if (event.startsWith('validation.failed ')) output.warn(`focus.${event}`);
+      else if (event === 'failure') output.warn('focus.analysis.failed');
+      else if (event !== 'request') output.debug(`focus.${event.replace(/^cache-/, 'cache.').replace(/^skip:/, 'skip.')}`);
+    },
   });
 
   // VS Code starts asynchronous hover providers halfway through its editor delay.
@@ -72,7 +78,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       askModel('hover', generation, messages, maxTokens, canSend, onSent),
     editorHoverDelayMs: getProviderDelay(),
     isGenerationCurrent: (generation) => settings.isGenerationCurrent(generation),
-    onDiagnostic: ({ kind }) => output.appendLine(`hover ${kind}`),
+    onDiagnostic: ({ kind, language, line }) => {
+      if (kind === 'failure') output.warn(`hover.analysis.failed language=${language} line=${line}`);
+      else if (kind !== 'request') output.debug(`hover.${kind.replace(/^cache-/, 'cache.')} language=${language} line=${line}`);
+    },
   });
 
   const ensureConsent = async (): Promise<boolean> => {
@@ -166,7 +175,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         const statement = selected.includesFullStatement ? selected.statementRange : null;
         const targetIdentity = statement ? `${statement.start}:${statement.end}` : String(position.line + 1);
         const progress = inlineHover.track(editor, position.line, token);
-        const cancel = token.onCancellationRequested(progress.stop);
+        const cancel = token.onCancellationRequested(() => {
+          progress.stop();
+          output.debug(`hover.cancelled language=${document.languageId} line=${position.line + 1}`);
+        });
         try {
           const text = await hover.explain({
             language: document.languageId, line: position.line + 1, documentVersion,
