@@ -39,6 +39,7 @@ export type HoverRequester = (
   call: HoverModelCall,
   identity: HoverConfigIdentity,
   canSend: () => boolean,
+  onSent: () => void,
 ) => Promise<string>;
 
 /** The subset of VS Code's CancellationToken this runtime needs. */
@@ -323,6 +324,7 @@ function validRequest(
 interface HoverWaiter {
   readonly request: HoverExplanationRequest;
   readonly token: HoverCancellationToken;
+  readonly onProgress?: HoverProgress;
 }
 
 interface HoverJob {
@@ -330,7 +332,10 @@ interface HoverJob {
   readonly waiters: Set<HoverWaiter>;
   promise: Promise<string | undefined>;
   settled: boolean;
+  sent: boolean;
 }
+
+type HoverProgress = (phase: number | 'sent') => void;
 
 export class HoverEngine {
   private readonly request: HoverRequester;
@@ -374,6 +379,7 @@ export class HoverEngine {
   async explain(
     request: HoverExplanationRequest,
     token: HoverCancellationToken,
+    onProgress?: HoverProgress,
   ): Promise<string | undefined> {
     if (
       this.disposed ||
@@ -395,6 +401,7 @@ export class HoverEngine {
     this.diagnose('cache-miss', request);
     const dwell = this.coldDwell;
     if (dwell > 0) {
+      onProgress?.(dwell);
       const ready = await this.waitForDwell(dwell, token);
       if (!ready || !this.canDisplay(request, token)) {
         return undefined;
@@ -410,8 +417,9 @@ export class HoverEngine {
 
     const pending = this.inFlight.get(key);
     if (pending !== undefined) {
-      const waiter: HoverWaiter = { request, token };
+      const waiter: HoverWaiter = { request, token, onProgress };
       pending.waiters.add(waiter);
+      if (pending.sent && this.canDisplay(request, token)) onProgress?.('sent');
       this.diagnose('dedup', request);
       let shared: string | undefined;
       try {
@@ -424,7 +432,7 @@ export class HoverEngine {
         : undefined;
     }
 
-    const waiter: HoverWaiter = { request, token };
+    const waiter: HoverWaiter = { request, token, onProgress };
     const job = this.startJob(request, key, waiter);
     let text: string | undefined;
     try {
@@ -457,6 +465,7 @@ export class HoverEngine {
       waiters: new Set<HoverWaiter>([first]),
       promise: Promise.resolve(undefined),
       settled: false,
+      sent: false,
     };
     this.inFlight.set(key, job);
     job.promise = Promise.resolve()
@@ -501,6 +510,12 @@ export class HoverEngine {
         buildHoverModelCall(request),
         request.config,
         () => this.canSend(job),
+        () => {
+          job.sent = true;
+          for (const waiter of job.waiters) {
+            if (this.canDisplay(waiter.request, waiter.token)) waiter.onProgress?.('sent');
+          }
+        },
       );
       if (this.disposed) {
         return undefined;

@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { FocusController } from './focus';
 import { HoverEngine } from './hover';
+import { InlineHover } from './inlineHover';
 import { collectHoverContext, isSupportedLanguage, queryDocumentSymbols } from './language';
 import { type ChatMessage, complete, ModelError } from './model';
 import { createSettingsService, SettingsError } from './settings';
@@ -16,13 +17,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const settings = await createSettingsService(context);
   const output = vscode.window.createOutputChannel('First Read');
   const decoration = vscode.window.createTextEditorDecorationType({ opacity: '0.36' });
+  const inlineHover = new InlineHover();
   let hoverEnabled = false;
   let requests = 0;
   let hoverEpoch = 0;
 
   const askModel = async (
     feature: 'focus' | 'hover', generation: number, messages: readonly ChatMessage[],
-    maxTokens: number, canSend: () => boolean,
+    maxTokens: number, canSend: () => boolean, onSent?: () => void,
   ) => {
     if (!canSend()) throw new vscode.CancellationError();
     const { config } = await settings.getModelRequestSettings(generation);
@@ -31,7 +33,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const start = Date.now();
     output.appendLine(`${feature} request #${id}`);
     try {
-      const result = await complete(config, messages, maxTokens);
+      const result = await complete(config, messages, maxTokens, onSent && ((url, init) => {
+        const response = fetch(url, init);
+        onSent();
+        return response;
+      }));
       const input = result.usage?.input;
       const outputTokens = result.usage?.output;
       output.appendLine(`${feature} request #${id} completed in ${Date.now() - start} ms${input === undefined ? '' : `; input tokens: ${input}`}${outputTokens === undefined ? '' : `; output tokens: ${outputTokens}`}`);
@@ -62,7 +68,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const getProviderDelay = (document?: vscode.TextDocument): number =>
     vscode.workspace.getConfiguration('editor', document).get<number>('hover.delay', 300) / 2;
   const hover = new HoverEngine({
-    request: ({ messages, maxTokens }, { generation }, canSend) => askModel('hover', generation, messages, maxTokens, canSend),
+    request: ({ messages, maxTokens }, { generation }, canSend, onSent) =>
+      askModel('hover', generation, messages, maxTokens, canSend, onSent),
     editorHoverDelayMs: getProviderDelay(),
     isGenerationCurrent: (generation) => settings.isGenerationCurrent(generation),
     onDiagnostic: ({ kind }) => output.appendLine(`hover ${kind}`),
@@ -78,8 +85,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
   };
 
-  context.subscriptions.push(settings, output, decoration, focus, hover,
-    settings.onDidChange(() => focus.reset()),
+  context.subscriptions.push(settings, output, decoration, focus, hover, inlineHover,
+    settings.onDidChange(() => { focus.reset(); inlineHover.clear(); }),
     vscode.commands.registerCommand('firstRead.setApiKey', () => settings.setApiKey()),
     vscode.commands.registerCommand('firstRead.toggleFocus', async () => {
       const editor = vscode.window.activeTextEditor;
@@ -91,22 +98,35 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand('firstRead.toggleHover', async () => {
       if (hoverEnabled) {
         hoverEnabled = false;
+        inlineHover.clear();
       } else if (await ensureConsent()) {
         hoverEnabled = true;
       }
       ++hoverEpoch;
       void vscode.window.setStatusBarMessage(`First Read: hover explanations ${hoverEnabled ? 'on' : 'off'}`, 2000);
     }),
-    vscode.window.onDidChangeActiveTextEditor((editor) => { if (editor) focus.onViewport(editor); }),
+    vscode.window.onDidChangeActiveTextEditor((editor) => {
+      inlineHover.clearProgress();
+      if (editor) focus.onViewport(editor);
+    }),
     vscode.window.onDidChangeTextEditorVisibleRanges(({ textEditor }) => {
       if (textEditor === vscode.window.activeTextEditor) focus.onViewport(textEditor);
     }),
-    vscode.window.onDidChangeVisibleTextEditors((editors) => focus.prune(editors)),
-    vscode.workspace.onDidChangeTextDocument(({ document, contentChanges }) => { if (contentChanges.length) focus.onChange(document); }),
+    vscode.window.onDidChangeVisibleTextEditors((editors) => {
+      focus.prune(editors);
+      if (hoverEnabled) for (const editor of editors) inlineHover.render(editor);
+    }),
+    vscode.workspace.onDidChangeTextDocument(({ document, contentChanges }) => {
+      if (!contentChanges.length) return;
+      focus.onChange(document);
+      inlineHover.clearDocument(document);
+    }),
+    vscode.workspace.onDidCloseTextDocument((document) => inlineHover.clearDocument(document)),
     vscode.languages.registerHoverProvider(languages, {
-      async provideHover(document, position, token) {
+      async provideHover(document, position, token): Promise<undefined> {
         const editor = vscode.window.activeTextEditor;
         if (!hoverEnabled || editor?.document !== document || !settings.hasTransportConsent()) return;
+        if (inlineHover.has(document, position.line)) return;
         const { generation, endpoint, model } = settings.snapshot;
         const documentVersion = document.version;
         const epoch = hoverEpoch;
@@ -118,13 +138,22 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         hover.updateEditorHoverDelay(getProviderDelay(document));
         const statement = selected.includesFullStatement ? selected.statementRange : null;
         const targetIdentity = statement ? `${statement.start}:${statement.end}` : String(position.line + 1);
-        const text = await hover.explain({
-          language: document.languageId, line: position.line + 1, documentVersion,
-          context: selected.prompt, target: targetIdentity,
-          config: { generation, endpoint, model }, isCurrent,
-        }, token);
-        if (!text || token.isCancellationRequested || !isCurrent() || !settings.isGenerationCurrent(generation)) return;
-        return new vscode.Hover(new vscode.MarkdownString().appendText(text), target.range);
+        const progress = inlineHover.track(editor, position.line, token);
+        const cancel = token.onCancellationRequested(progress.stop);
+        try {
+          const text = await hover.explain({
+            language: document.languageId, line: position.line + 1, documentVersion,
+            context: selected.prompt, target: targetIdentity,
+            config: { generation, endpoint, model }, isCurrent,
+          }, token, progress.phase);
+          if (text && !token.isCancellationRequested && isCurrent() && settings.isGenerationCurrent(generation)) {
+            progress.stop();
+            inlineHover.show(document, position.line, text);
+          }
+        } finally {
+          cancel.dispose();
+          progress.stop();
+        }
       },
     }),
   );

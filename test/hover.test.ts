@@ -302,6 +302,23 @@ test('cancellation during the cold dwell cancels the timer and never dispatches'
   assert.equal(calls, 0);
 });
 
+test('cold inline hover reports dwell then network dispatch; a cache hit reports neither', async () => {
+  const clock = new ManualClock();
+  const phases: (number | 'sent')[] = [];
+  const hover = engine(async (_call, _identity, canSend, onSent) => {
+    assert.equal(canSend(), true);
+    onSent();
+    return validText;
+  }, { editorHoverDelayMs: 0, coldHoverTargetMs: 120, clock });
+  const pending = hover.explain(request(), new TestToken(), (phase) => phases.push(phase));
+  assert.deepEqual(phases, [120]);
+  clock.advance();
+  assert.equal(await pending, validText);
+  assert.deepEqual(phases, [120, 'sent']);
+  assert.equal(await hover.explain(request(), new TestToken(), () => assert.fail('cache hit reported progress')), validText);
+  assert.deepEqual(phases, [120, 'sent']);
+});
+
 test('a cached explanation skips the cold dwell', async () => {
   let calls = 0;
   const diagnostics: string[] = [];
