@@ -42,7 +42,7 @@ export class InlineHover implements vscode.Disposable {
     editor.setDecorations(this.explanationType, decorations);
   }
 
-  track(editor: vscode.TextEditor, line: number, token: vscode.CancellationToken): {
+  track(editor: vscode.TextEditor, line: number, token: vscode.CancellationToken, pendingText: string): {
     phase: (phase: number | 'sent') => void;
     stop: () => void;
   } {
@@ -64,7 +64,7 @@ export class InlineHover implements vscode.Disposable {
       }
       clearInterval(timer);
       if (phase === 'sent') {
-        show('Explaining...');
+        show(pendingText);
         return;
       }
       const started = performance.now();

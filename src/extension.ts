@@ -188,7 +188,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         hover.updateEditorHoverDelay(getProviderDelay(document));
         const statement = selected.includesFullStatement ? selected.statementRange : null;
         const targetIdentity = statement ? `${statement.start}:${statement.end}` : String(position.line + 1);
-        const progress = inlineHover.track(editor, position.line, token);
+        const pendingText = explanationLanguage === 'zh-CN' ? '解释中...' : 'Explaining...';
+        const progress = inlineHover.track(editor, position.line, token, pendingText);
         const cancel = token.onCancellationRequested(() => {
           progress.stop();
           output.debug(`hover.cancelled language=${document.languageId} line=${position.line + 1}`);
