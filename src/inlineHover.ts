@@ -64,7 +64,7 @@ export class InlineHover implements vscode.Disposable {
       }
       clearInterval(timer);
       if (phase === 'sent') {
-        show('正在解释...');
+        show('Explaining...');
         return;
       }
       const started = performance.now();

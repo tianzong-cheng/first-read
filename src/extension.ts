@@ -85,29 +85,55 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
   };
 
-  context.subscriptions.push(settings, output, decoration, focus, hover, inlineHover,
-    settings.onDidChange(() => { focus.reset(); inlineHover.clear(); }),
-    vscode.commands.registerCommand('firstRead.setApiKey', () => settings.setApiKey()),
-    vscode.commands.registerCommand('firstRead.toggleFocus', async () => {
-      const editor = vscode.window.activeTextEditor;
-      if (!editor || !isSupportedLanguage(editor.document.languageId)) return;
-      if (focus.isEnabled(editor) || await ensureConsent()) {
-        if (vscode.window.activeTextEditor === editor) focus.toggle(editor);
-      }
-    }),
-    vscode.commands.registerCommand('firstRead.toggleHover', async () => {
-      if (hoverEnabled) {
-        hoverEnabled = false;
-        inlineHover.clear();
-      } else if (await ensureConsent()) {
-        hoverEnabled = true;
-      }
+  const publishToolbarState = () => {
+    const editor = vscode.window.activeTextEditor;
+    void vscode.commands.executeCommand('setContext', 'firstRead.focusEnabled', !!editor && focus.isEnabled(editor));
+    void vscode.commands.executeCommand('setContext', 'firstRead.hoverEnabled', hoverEnabled);
+  };
+
+  const setReadingModes = async (
+    editor: vscode.TextEditor | undefined, focusTarget?: boolean, hoverTarget?: boolean,
+  ): Promise<void> => {
+    if (focusTarget !== undefined && (!editor || !isSupportedLanguage(editor.document.languageId))) return;
+    const needsConsent = (focusTarget === true && editor && !focus.isEnabled(editor)) ||
+      (hoverTarget === true && !hoverEnabled);
+    if (needsConsent && !await ensureConsent()) return;
+    if (focusTarget !== undefined && editor !== vscode.window.activeTextEditor) return;
+
+    if (editor && focusTarget !== undefined && focus.isEnabled(editor) !== focusTarget) focus.toggle(editor);
+    if (hoverTarget !== undefined && hoverEnabled !== hoverTarget) {
+      hoverEnabled = hoverTarget;
       ++hoverEpoch;
+      if (!hoverEnabled) inlineHover.clear();
       void vscode.window.setStatusBarMessage(`First Read: hover explanations ${hoverEnabled ? 'on' : 'off'}`, 2000);
+    }
+    publishToolbarState();
+  };
+
+  publishToolbarState();
+
+  context.subscriptions.push(settings, output, decoration, focus, hover, inlineHover,
+    settings.onDidChange(() => { focus.reset(); inlineHover.clear(); publishToolbarState(); }),
+    vscode.commands.registerCommand('firstRead.setApiKey', () => settings.setApiKey()),
+    vscode.commands.registerCommand('firstRead.toggleBoth', () => {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor) return;
+      const turnOn = !focus.isEnabled(editor) || !hoverEnabled;
+      return setReadingModes(editor, turnOn, turnOn);
     }),
+    vscode.commands.registerCommand('firstRead.toggleFocus', () => {
+      const editor = vscode.window.activeTextEditor;
+      if (editor) return setReadingModes(editor, !focus.isEnabled(editor));
+    }),
+    vscode.commands.registerCommand('firstRead.toggleHover', () => setReadingModes(undefined, undefined, !hoverEnabled)),
+    vscode.commands.registerCommand('firstRead.enableFocus', () => setReadingModes(vscode.window.activeTextEditor, true)),
+    vscode.commands.registerCommand('firstRead.disableFocus', () => setReadingModes(vscode.window.activeTextEditor, false)),
+    vscode.commands.registerCommand('firstRead.enableHover', () => setReadingModes(undefined, undefined, true)),
+    vscode.commands.registerCommand('firstRead.disableHover', () => setReadingModes(undefined, undefined, false)),
     vscode.window.onDidChangeActiveTextEditor((editor) => {
       inlineHover.clearProgress();
       if (editor) focus.onViewport(editor);
+      publishToolbarState();
     }),
     vscode.window.onDidChangeTextEditorVisibleRanges(({ textEditor }) => {
       if (textEditor === vscode.window.activeTextEditor) focus.onViewport(textEditor);
@@ -115,6 +141,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.window.onDidChangeVisibleTextEditors((editors) => {
       focus.prune(editors);
       if (hoverEnabled) for (const editor of editors) inlineHover.render(editor);
+      publishToolbarState();
     }),
     vscode.workspace.onDidChangeTextDocument(({ document, contentChanges }) => {
       if (!contentChanges.length) return;

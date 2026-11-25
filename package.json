@@ -27,6 +27,16 @@
   "contributes": {
     "commands": [
       {
+        "command": "firstRead.toggleBoth",
+        "title": "Toggle Both Features",
+        "category": "First Read",
+        "icon": "$(book)"
+      },
+      { "command": "firstRead.enableFocus", "title": "Enable Focus Mode" },
+      { "command": "firstRead.disableFocus", "title": "Disable Focus Mode" },
+      { "command": "firstRead.enableHover", "title": "Enable Hover Explanations" },
+      { "command": "firstRead.disableHover", "title": "Disable Hover Explanations" },
+      {
         "command": "firstRead.toggleFocus",
         "title": "Toggle Focus Mode",
         "category": "First Read"
@@ -42,6 +52,35 @@
         "category": "First Read"
       }
     ],
+    "submenus": [
+      { "id": "firstRead.editorOptions", "label": "First Read Options", "icon": "$(chevron-down)" }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "firstRead.toggleBoth",
+          "when": "isWorkspaceTrusted && (resourceLangId == python || resourceLangId == cpp)",
+          "group": "navigation@90"
+        },
+        {
+          "submenu": "firstRead.editorOptions",
+          "when": "isWorkspaceTrusted && (resourceLangId == python || resourceLangId == cpp)",
+          "group": "navigation@91"
+        }
+      ],
+      "firstRead.editorOptions": [
+        { "command": "firstRead.enableFocus", "when": "!firstRead.focusEnabled", "group": "features@1" },
+        { "command": "firstRead.disableFocus", "when": "firstRead.focusEnabled", "group": "features@1" },
+        { "command": "firstRead.enableHover", "when": "!firstRead.hoverEnabled", "group": "features@2" },
+        { "command": "firstRead.disableHover", "when": "firstRead.hoverEnabled", "group": "features@2" }
+      ],
+      "commandPalette": [
+        { "command": "firstRead.enableFocus", "when": "false" },
+        { "command": "firstRead.disableFocus", "when": "false" },
+        { "command": "firstRead.enableHover", "when": "false" },
+        { "command": "firstRead.disableHover", "when": "false" }
+      ]
+    },
     "keybindings": [
       {
         "command": "firstRead.toggleFocus",
